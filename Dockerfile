@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Application code
-COPY config.py main.py webhook_server.py signal_processor.py telegram_notifier.py telegram_poller.py subscribed_chats.py coinglass_poller.py ./
+COPY config.py main.py webhook_server.py signal_processor.py telegram_notifier.py telegram_poller.py subscribed_chats.py ai_chat.py coinglass_poller.py ./
 
 # Default port 80 for TradingView HTTP webhooks
 EXPOSE 80

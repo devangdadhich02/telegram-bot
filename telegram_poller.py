@@ -55,7 +55,8 @@ def _process_update(update: Dict[str, Any]) -> None:
     if not message:
         return
     chat = message.get("chat")
-    text = (message.get("text") or "").strip().lower()
+    raw_text = (message.get("text") or "").strip()
+    text = raw_text.lower()
     if not chat:
         return
     chat_id = chat.get("id")
@@ -74,12 +75,22 @@ def _process_update(update: Dict[str, Any]) -> None:
             logger.info("Unsubscribed: chat_id=%s", chat_id)
         _send_message(chat_id, GOODBYE_MESSAGE)
     else:
-        # Reply to any other message so the bot doesn't feel unresponsive
-        from subscribed_chats import load_subscribed_chat_ids
-        if chat_id in load_subscribed_chat_ids():
-            _send_message(chat_id, REPLY_WHEN_SUBSCRIBED)
+        # AI reply if enabled and key set; otherwise fixed reply so the bot doesn't feel unresponsive
+        reply = None
+        if config.ENABLE_AI_CHAT and config.OPENAI_API_KEY and raw_text:
+            try:
+                from ai_chat import get_ai_reply
+                reply = get_ai_reply(raw_text)
+            except Exception as e:
+                logger.warning("AI chat failed: %s", e)
+        if reply:
+            _send_message(chat_id, reply)
         else:
-            _send_message(chat_id, REPLY_WHEN_NOT_SUBSCRIBED)
+            from subscribed_chats import load_subscribed_chat_ids
+            if chat_id in load_subscribed_chat_ids():
+                _send_message(chat_id, REPLY_WHEN_SUBSCRIBED)
+            else:
+                _send_message(chat_id, REPLY_WHEN_NOT_SUBSCRIBED)
 
 
 def _poll_once(offset: int) -> int:

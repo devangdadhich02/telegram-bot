@@ -43,6 +43,11 @@ TELEGRAM_CHAT_ID = _get_str("TELEGRAM_CHAT_ID")
 # Subscribers are stored in SUBSCRIBED_CHATS_FILE. TELEGRAM_CHAT_ID is optional (e.g. group to also broadcast).
 ENABLE_SUBSCRIBER_MODE = _get_bool("ENABLE_SUBSCRIBER_MODE", True)
 SUBSCRIBED_CHATS_FILE = _get_str("SUBSCRIBED_CHATS_FILE", "subscribed_chats.json")
+# When True and OPENAI_API_KEY is set: user messages get an AI-generated reply instead of a fixed message.
+ENABLE_AI_CHAT = _get_bool("ENABLE_AI_CHAT", False)
+OPENAI_API_KEY = _get_str("OPENAI_API_KEY")
+# Optional: model for chat (e.g. gpt-4o-mini, gpt-3.5-turbo)
+OPENAI_CHAT_MODEL = _get_str("OPENAI_CHAT_MODEL", "gpt-4o-mini")
 
 # -----------------------------------------------------------------------------
 # Webhook server (TradingView)

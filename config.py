@@ -43,7 +43,7 @@ TELEGRAM_CHAT_ID = _get_str("TELEGRAM_CHAT_ID")
 # -----------------------------------------------------------------------------
 # Webhook server (TradingView)
 # -----------------------------------------------------------------------------
-WEBHOOK_PORT = _get_int("WEBHOOK_PORT", 5000)
+WEBHOOK_PORT = _get_int("WEBHOOK_PORT", 80)
 WEBHOOK_HOST = _get_str("WEBHOOK_HOST", "0.0.0.0")
 
 # -----------------------------------------------------------------------------
@@ -85,6 +85,17 @@ ALERT_COOLDOWN_SECONDS = _get_int("ALERT_COOLDOWN_SECONDS", 300)
 MAX_ALERTS_PER_MINUTE = _get_int("MAX_ALERTS_PER_MINUTE", 10)
 ENABLE_TRADINGVIEW_WEBHOOK = _get_bool("ENABLE_TRADINGVIEW_WEBHOOK", True)
 ENABLE_COINGLASS_LIQUIDATION = _get_bool("ENABLE_COINGLASS_LIQUIDATION", True)
+
+# -----------------------------------------------------------------------------
+# Chart snapshot (optional)
+# -----------------------------------------------------------------------------
+# If ENABLE_CHART_IMAGE is true and CHART_IMAGE_API_BASE is set, the bot will
+# attempt to generate a chart image for each alert and send it as a photo with
+# caption instead of plain text. CHART_IMAGE_API_BASE should point to a service
+# that returns a PNG/JPEG when called with symbol/interval query parameters.
+ENABLE_CHART_IMAGE = _get_bool("ENABLE_CHART_IMAGE", False)
+CHART_IMAGE_API_BASE = _get_str("CHART_IMAGE_API_BASE")
+CHART_IMAGE_API_KEY = _get_str("CHART_IMAGE_API_KEY")
 
 
 def validate_config() -> List[str]:

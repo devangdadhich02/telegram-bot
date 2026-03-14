@@ -23,6 +23,8 @@ def format_signal_message(signal: ProcessedSignal) -> str:
     """
     Build a concise notification text for Telegram (plain text, no markdown by default
     to avoid parse errors with special characters in symbols).
+    If the original payload includes advanced fields such as TP/SL, leverage, pattern,
+    they are appended when present so TradingView strategies can enrich the message.
     """
     lines = [
         f"🪙 {signal.asset_pair}  ·  {signal.timeframe}",
@@ -31,6 +33,41 @@ def format_signal_message(signal: ProcessedSignal) -> str:
         f"Time: {signal.timestamp}",
         f"Recommendation: {signal.recommendation}",
     ]
+
+    payload = signal.raw_payload or {}
+    # Optional advanced fields from TradingView strategy/indicator
+    pattern = payload.get("pattern") or payload.get("chart_pattern")
+    leverage = payload.get("leverage")
+    entry = payload.get("entry")
+    sl = payload.get("sl") or payload.get("stop_loss")
+    tp1 = payload.get("tp1")
+    tp2 = payload.get("tp2")
+    tp3 = payload.get("tp3")
+    gain = payload.get("gain_percent") or payload.get("gain_pct")
+
+    if pattern:
+        lines.append(f"Pattern: {pattern}")
+    if leverage:
+        lines.append(f"Leverage: {leverage}")
+    if entry or sl:
+        parts = []
+        if entry:
+            parts.append(f"Entry: {entry}")
+        if sl:
+            parts.append(f"SL: {sl}")
+        lines.append(", ".join(parts))
+    if tp1 or tp2 or tp3:
+        tp_parts = []
+        if tp1:
+            tp_parts.append(f"TP1: {tp1}")
+        if tp2:
+            tp_parts.append(f"TP2: {tp2}")
+        if tp3:
+            tp_parts.append(f"TP3: {tp3}")
+        lines.append(", ".join(tp_parts))
+    if gain:
+        lines.append(f"Gain: {gain}")
+
     return "\n".join(lines)
 
 
@@ -59,9 +96,86 @@ def send_telegram_message(text: str) -> bool:
         return False
 
 
+def _generate_chart_image(signal: ProcessedSignal) -> Optional[bytes]:
+    """
+    Optionally call an external chart snapshot service to get a TradingView-style
+    chart image as PNG/JPEG bytes. The service URL and API key are configured
+    via .env (CHART_IMAGE_API_BASE, CHART_IMAGE_API_KEY).
+    """
+    if not config.ENABLE_CHART_IMAGE:
+        return None
+    if not config.CHART_IMAGE_API_BASE:
+        logger.warning("Chart image enabled but CHART_IMAGE_API_BASE is empty")
+        return None
+
+    params = {
+        "symbol": signal.asset_pair,
+        "interval": signal.timeframe,
+    }
+    headers = {}
+    if config.CHART_IMAGE_API_KEY:
+        headers["X-API-KEY"] = config.CHART_IMAGE_API_KEY
+
+    try:
+        resp = requests.get(
+            config.CHART_IMAGE_API_BASE,
+            params=params,
+            headers=headers,
+            timeout=20,
+        )
+        if resp.status_code == 200 and resp.content:
+            return resp.content
+        logger.error(
+            "Chart image API error: %s %s", resp.status_code, resp.text[:200]
+        )
+        return None
+    except requests.RequestException as e:
+        logger.exception("Failed to fetch chart image: %s", e)
+        return None
+
+
+def send_telegram_photo_with_caption(
+    caption: str, image_bytes: bytes
+) -> bool:
+    """
+    Send a photo with caption to the configured Telegram chat.
+    Returns True on success, False otherwise.
+    """
+    if not config.TELEGRAM_BOT_TOKEN or not config.TELEGRAM_CHAT_ID:
+        logger.warning("Telegram not configured; skipping send")
+        return False
+
+    url = f"{TELEGRAM_API_BASE}{config.TELEGRAM_BOT_TOKEN}/sendPhoto"
+    data = {
+        "chat_id": config.TELEGRAM_CHAT_ID,
+        "caption": caption,
+    }
+    files = {
+        "photo": ("chart.png", image_bytes),
+    }
+    try:
+        r = requests.post(url, data=data, files=files, timeout=20)
+        if r.status_code == 200:
+            return True
+        logger.error("Telegram sendPhoto error: %s %s", r.status_code, r.text)
+        return False
+    except requests.RequestException as e:
+        logger.exception("Failed to send Telegram photo: %s", e)
+        return False
+
+
 def notify_signal(signal: ProcessedSignal) -> bool:
-    """Format and send a ProcessedSignal to Telegram."""
+    """
+    Format and send a ProcessedSignal to Telegram.
+    If chart snapshots are enabled and a chart image can be generated, send it
+    as a photo with caption; otherwise fall back to plain text.
+    """
     text = format_signal_message(signal)
+
+    image_bytes = _generate_chart_image(signal)
+    if image_bytes:
+        return send_telegram_photo_with_caption(text, image_bytes)
+
     return send_telegram_message(text)
 
 

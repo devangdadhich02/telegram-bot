@@ -59,7 +59,7 @@ Edit `.env`:
 |----------|-------------|
 | `TELEGRAM_BOT_TOKEN` | From @BotFather |
 | `TELEGRAM_CHAT_ID` | Your chat or channel ID (e.g. from @userinfobot) |
-| `WEBHOOK_PORT` | Port for webhook server (default `5000`) |
+| `WEBHOOK_PORT` | Port for webhook server (default `80`; TradingView HTTP allows only port 80) |
 | `COINGLASS_API_KEY` | Optional; leave empty to disable liquidation polling |
 | `COINGLASS_SYMBOLS` | e.g. `Binance:BTCUSDT,Binance:ETHUSDT` |
 | `RSI_OVERSOLD` / `RSI_OVERBOUGHT` | RSI thresholds (default 30 / 70) |
@@ -76,11 +76,11 @@ python main.py
 You should see:
 
 ```
-Starting webhook server (FastAPI) on 0.0.0.0:5000
+Starting webhook server (FastAPI) on 0.0.0.0:80
 ```
 
-- **Health check**: `http://localhost:5000/health`
-- **TradingView webhook URL**: `http://YOUR_SERVER_IP:5000/webhook` (use HTTPS in production; see below).
+- **Health check**: `http://localhost:80/health` (or `http://YOUR_SERVER_IP/health`)
+- **TradingView webhook URL**: `http://YOUR_SERVER_IP/webhook` (TradingView allows only port 80 for HTTP; use HTTPS in production; see below).
 - The server uses **FastAPI** with **Uvicorn** (async, fast).
 
 ---
@@ -208,18 +208,18 @@ Your bot runs **inside the VPS** on port 5000. TradingView is on the **internet*
 
 #### Option 1: Only VPS IP (quick test, HTTP)
 
-- On the VPS: run the bot (`python main.py` or Docker), and open **port 5000** in the firewall.
-- **Webhook URL for TradingView:** `http://YOUR_VPS_IP:5000/webhook`  
-  Example: VPS IP = `203.0.113.50` → URL = `http://203.0.113.50:5000/webhook`
+- On the VPS: run the bot (`python main.py` or Docker), and open **port 80** in the firewall.
+- **Webhook URL for TradingView:** `http://YOUR_VPS_IP/webhook` (no port; TradingView allows only port 80 for HTTP)
+  Example: VPS IP = `203.0.113.50` → URL = `http://203.0.113.50/webhook`
 - **Limitation:** HTTP only (no HTTPS). Some networks or TradingView may prefer HTTPS. Good for testing.
 
 **Steps on VPS (Linux):**
 
 ```bash
-# Open port 5000 (example for ufw)
-sudo ufw allow 5000
+# Open port 80 (example for ufw)
+sudo ufw allow 80
 sudo ufw reload
-# Check: from your PC browser open http://YOUR_VPS_IP:5000/health — should show {"status":"ok",...}
+# Check: from your PC browser open http://YOUR_VPS_IP/health — should show {"status":"ok",...}
 ```
 
 #### Option 2: Domain + HTTPS (recommended for production)
@@ -305,7 +305,7 @@ Jis pair pe alert chahiye (e.g. BTCUSDT, EURUSD) wo chart open karo. Timeframe s
 
 **Step 4 – Webhook URL daalo**  
 - **Notifications** section me **Webhook URL** field dikhega.  
-- Paste: `https://signals.yourdomain.com/webhook` (ya `http://VPS_IP:5000/webhook` agar Option 1 use kar rahe ho).  
+- Paste: `https://signals.yourdomain.com/webhook` (ya `http://VPS_IP/webhook` agar Option 1 use kar rahe ho).  
 - **Message** field me **JSON** daalna hai (plain text nahi). Example for **RSI**:
 
 ```json

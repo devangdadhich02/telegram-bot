@@ -8,8 +8,7 @@ services:
     restart: unless-stopped
     env_file: .env
     ports:
-      - "5000:5000"
-    # Optional: bind to same host/port as in .env
+      - "80:80"
     environment:
       - WEBHOOK_HOST=0.0.0.0
-      - WEBHOOK_PORT=5000
+      - WEBHOOK_PORT=80

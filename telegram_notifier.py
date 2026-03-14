@@ -88,6 +88,7 @@ def send_telegram_message(text: str) -> bool:
     try:
         r = requests.post(url, json=payload, timeout=10)
         if r.status_code == 200:
+            logger.info("Telegram sendMessage OK (chat_id=%s)", config.TELEGRAM_CHAT_ID)
             return True
         logger.error("Telegram API error: %s %s", r.status_code, r.text)
         return False

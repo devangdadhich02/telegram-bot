@@ -26,6 +26,12 @@ WELCOME_MESSAGE = (
 
 GOODBYE_MESSAGE = "You've been unsubscribed. Send /start anytime to receive signals again."
 
+REPLY_WHEN_SUBSCRIBED = (
+    "✅ You're subscribed. Trading signals (RSI, MACD, liquidation) will appear here automatically when conditions are met.\n\n"
+    "Send /stop to unsubscribe."
+)
+REPLY_WHEN_NOT_SUBSCRIBED = "Send /start to subscribe and receive trading signals here."
+
 
 def _send_message(chat_id: int, text: str) -> bool:
     if not config.TELEGRAM_BOT_TOKEN:
@@ -67,6 +73,13 @@ def _process_update(update: Dict[str, Any]) -> None:
         if remove_subscriber(chat_id):
             logger.info("Unsubscribed: chat_id=%s", chat_id)
         _send_message(chat_id, GOODBYE_MESSAGE)
+    else:
+        # Reply to any other message so the bot doesn't feel unresponsive
+        from subscribed_chats import load_subscribed_chat_ids
+        if chat_id in load_subscribed_chat_ids():
+            _send_message(chat_id, REPLY_WHEN_SUBSCRIBED)
+        else:
+            _send_message(chat_id, REPLY_WHEN_NOT_SUBSCRIBED)
 
 
 def _poll_once(offset: int) -> int:

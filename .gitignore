@@ -24,3 +24,6 @@ Thumbs.db
 # Logs and temp
 *.log
 .cache/
+
+# Subscriber list (private)
+subscribed_chats.json

@@ -39,6 +39,10 @@ def _get_bool(key: str, default: bool = True) -> bool:
 # -----------------------------------------------------------------------------
 TELEGRAM_BOT_TOKEN = _get_str("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = _get_str("TELEGRAM_CHAT_ID")
+# When True: anyone who /start the bot gets welcome and receives signals in private chat.
+# Subscribers are stored in SUBSCRIBED_CHATS_FILE. TELEGRAM_CHAT_ID is optional (e.g. group to also broadcast).
+ENABLE_SUBSCRIBER_MODE = _get_bool("ENABLE_SUBSCRIBER_MODE", True)
+SUBSCRIBED_CHATS_FILE = _get_str("SUBSCRIBED_CHATS_FILE", "subscribed_chats.json")
 
 # -----------------------------------------------------------------------------
 # Webhook server (TradingView)
@@ -103,8 +107,8 @@ def validate_config() -> List[str]:
     errors = []
     if not TELEGRAM_BOT_TOKEN:
         errors.append("TELEGRAM_BOT_TOKEN is required")
-    if not TELEGRAM_CHAT_ID:
-        errors.append("TELEGRAM_CHAT_ID is required")
+    if not ENABLE_SUBSCRIBER_MODE and not TELEGRAM_CHAT_ID:
+        errors.append("TELEGRAM_CHAT_ID is required when ENABLE_SUBSCRIBER_MODE is false")
     if ENABLE_COINGLASS_LIQUIDATION and not COINGLASS_API_KEY:
         errors.append("COINGLASS_API_KEY is required when ENABLE_COINGLASS_LIQUIDATION is true")
     return errors

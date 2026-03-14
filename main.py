@@ -11,6 +11,7 @@ import uvicorn
 
 import config
 from coinglass_poller import start_poller_thread
+from telegram_poller import start_poller_thread as start_telegram_poller
 from webhook_server import app
 
 # -----------------------------------------------------------------------------
@@ -38,6 +39,10 @@ def main() -> None:
         start_poller_thread()
     else:
         logger.info("Coinglass liquidation polling disabled or no API key")
+
+    # Start Telegram /start subscriber poller (welcome message + subscribe list)
+    if config.ENABLE_SUBSCRIBER_MODE:
+        start_telegram_poller()
 
     logger.info(
         "Starting webhook server (FastAPI) on %s:%s",

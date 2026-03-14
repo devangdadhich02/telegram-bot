@@ -6,7 +6,7 @@ Sends concise alerts (asset, timeframe, trigger, values, Buy/Sell) to a chat or 
 import logging
 import time
 from collections import deque
-from typing import Optional
+from typing import Optional, Union
 
 import requests
 
@@ -71,30 +71,62 @@ def format_signal_message(signal: ProcessedSignal) -> str:
     return "\n".join(lines)
 
 
-def send_telegram_message(text: str) -> bool:
+def send_telegram_message_to_chat(chat_id: Union[str, int], text: str) -> bool:
     """
-    Send a plain text message to the configured Telegram chat.
+    Send a plain text message to a specific chat_id.
     Returns True on success, False on failure (logs error).
     """
-    if not config.TELEGRAM_BOT_TOKEN or not config.TELEGRAM_CHAT_ID:
+    if not config.TELEGRAM_BOT_TOKEN:
         logger.warning("Telegram not configured; skipping send")
         return False
     url = f"{TELEGRAM_API_BASE}{config.TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": config.TELEGRAM_CHAT_ID,
+        "chat_id": chat_id,
         "text": text,
         "disable_web_page_preview": True,
     }
     try:
         r = requests.post(url, json=payload, timeout=10)
         if r.status_code == 200:
-            logger.info("Telegram sendMessage OK (chat_id=%s)", config.TELEGRAM_CHAT_ID)
             return True
-        logger.error("Telegram API error: %s %s", r.status_code, r.text)
+        logger.error("Telegram API error for chat_id=%s: %s %s", chat_id, r.status_code, r.text)
         return False
     except requests.RequestException as e:
-        logger.exception("Failed to send Telegram message: %s", e)
+        logger.exception("Failed to send Telegram message to %s: %s", chat_id, e)
         return False
+
+
+def send_telegram_message(text: str) -> bool:
+    """
+    Send a plain text message to the configured Telegram chat (single chat mode).
+    Returns True if at least one send succeeded.
+    """
+    if not config.TELEGRAM_BOT_TOKEN:
+        logger.warning("Telegram not configured; skipping send")
+        return False
+    if config.ENABLE_SUBSCRIBER_MODE:
+        from subscribed_chats import get_subscribed_chat_ids
+        chat_ids = list(get_subscribed_chat_ids())
+        if config.TELEGRAM_CHAT_ID:
+            try:
+                extra = int(config.TELEGRAM_CHAT_ID)
+                if extra not in chat_ids:
+                    chat_ids.append(extra)
+            except ValueError:
+                if config.TELEGRAM_CHAT_ID not in chat_ids:
+                    chat_ids.append(config.TELEGRAM_CHAT_ID)
+        if not chat_ids:
+            logger.warning("No subscribers and no TELEGRAM_CHAT_ID; skipping send")
+            return False
+        ok_count = sum(1 for cid in chat_ids if send_telegram_message_to_chat(cid, text))
+        logger.info("Telegram sendMessage to %s chats (ok=%s)", len(chat_ids), ok_count)
+        return ok_count > 0
+    if not config.TELEGRAM_CHAT_ID:
+        return False
+    ok = send_telegram_message_to_chat(config.TELEGRAM_CHAT_ID, text)
+    if ok:
+        logger.info("Telegram sendMessage OK (chat_id=%s)", config.TELEGRAM_CHAT_ID)
+    return ok
 
 
 def _generate_chart_image(signal: ProcessedSignal) -> Optional[bytes]:
@@ -135,34 +167,53 @@ def _generate_chart_image(signal: ProcessedSignal) -> Optional[bytes]:
         return None
 
 
+def send_telegram_photo_to_chat(chat_id: Union[str, int], caption: str, image_bytes: bytes) -> bool:
+    """Send a photo with caption to a specific chat_id. Returns True on success."""
+    if not config.TELEGRAM_BOT_TOKEN:
+        return False
+    url = f"{TELEGRAM_API_BASE}{config.TELEGRAM_BOT_TOKEN}/sendPhoto"
+    data = {"chat_id": chat_id, "caption": caption}
+    files = {"photo": ("chart.png", image_bytes)}
+    try:
+        r = requests.post(url, data=data, files=files, timeout=20)
+        return r.status_code == 200
+    except requests.RequestException:
+        return False
+
+
 def send_telegram_photo_with_caption(
     caption: str, image_bytes: bytes
 ) -> bool:
     """
-    Send a photo with caption to the configured Telegram chat.
-    Returns True on success, False otherwise.
+    Send a photo with caption to configured chat(s).
+    In subscriber mode: all subscribers + optional TELEGRAM_CHAT_ID.
     """
-    if not config.TELEGRAM_BOT_TOKEN or not config.TELEGRAM_CHAT_ID:
+    if not config.TELEGRAM_BOT_TOKEN:
         logger.warning("Telegram not configured; skipping send")
         return False
-
-    url = f"{TELEGRAM_API_BASE}{config.TELEGRAM_BOT_TOKEN}/sendPhoto"
-    data = {
-        "chat_id": config.TELEGRAM_CHAT_ID,
-        "caption": caption,
-    }
-    files = {
-        "photo": ("chart.png", image_bytes),
-    }
-    try:
-        r = requests.post(url, data=data, files=files, timeout=20)
-        if r.status_code == 200:
-            return True
-        logger.error("Telegram sendPhoto error: %s %s", r.status_code, r.text)
+    if config.ENABLE_SUBSCRIBER_MODE:
+        from subscribed_chats import get_subscribed_chat_ids
+        chat_ids = list(get_subscribed_chat_ids())
+        if config.TELEGRAM_CHAT_ID:
+            try:
+                extra = int(config.TELEGRAM_CHAT_ID)
+                if extra not in chat_ids:
+                    chat_ids.append(extra)
+            except ValueError:
+                if config.TELEGRAM_CHAT_ID not in chat_ids:
+                    chat_ids.append(config.TELEGRAM_CHAT_ID)
+        if not chat_ids:
+            logger.warning("No subscribers; skipping photo send")
+            return False
+        ok_count = sum(
+            1 for cid in chat_ids
+            if send_telegram_photo_to_chat(cid, caption, image_bytes)
+        )
+        logger.info("Telegram sendPhoto to %s chats (ok=%s)", len(chat_ids), ok_count)
+        return ok_count > 0
+    if not config.TELEGRAM_CHAT_ID:
         return False
-    except requests.RequestException as e:
-        logger.exception("Failed to send Telegram photo: %s", e)
-        return False
+    return send_telegram_photo_to_chat(config.TELEGRAM_CHAT_ID, caption, image_bytes)
 
 
 def notify_signal(signal: ProcessedSignal) -> bool:

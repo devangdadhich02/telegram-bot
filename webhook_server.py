@@ -78,6 +78,8 @@ async def webhook(request: Request) -> Response:
             content={"ok": False, "reason": "invalid payload"},
         )
 
+    logger.info("Webhook received: symbol=%s trigger=%s", payload.get("symbol") or payload.get("ticker"), payload.get("trigger"))
+
     try:
         signal = process_tradingview_webhook(payload)
     except Exception as e:
@@ -95,10 +97,12 @@ async def webhook(request: Request) -> Response:
 
     sent = notify_signal_with_throttle(signal)
     if sent:
+        logger.info("Telegram message sent for %s %s", signal.asset_pair, signal.trigger_type)
         return JSONResponse(
             status_code=200,
             content={"ok": True, "message": "alert sent"},
         )
+    logger.info("Alert skipped (throttle/cooldown or send failed) for %s %s", signal.asset_pair, signal.trigger_type)
     return JSONResponse(
         status_code=200,
         content={"ok": True, "message": "alert skipped (throttle)"},
